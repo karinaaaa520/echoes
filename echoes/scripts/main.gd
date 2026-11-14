@@ -7,16 +7,23 @@ const SHOT_PREFIX := "--shot="
 const KEYS_PREFIX := "--keys="
 const DELAY_PREFIX := "--keydelay="
 
+## 通关后自动进入下一关的等待时长（秒）
+const AUTO_ADVANCE_SEC := 1.0
+
 @onready var world: WorldView = $World
 @onready var router: InputRouter = $InputRouter
 @onready var debug_label: Label = $UI/Debug
 @onready var win_overlay: Control = $UI/WinOverlay
+@onready var win_title_label: Label = $UI/WinOverlay/Center/Box/Title
 @onready var win_level_label: Label = $UI/WinOverlay/Center/Box/Level
+@onready var win_hint_label: Label = $UI/WinOverlay/Center/Box/Hint
 
 var resolver: TurnResolver = null
 var level_index := 0
 var is_fixture := false
 var _last_result: TurnResolver.StepResult = null
+var _chapter_end := false        ## true = 最后一关已通关，处于"章节结束"界面
+var _advance_token := 0          ## 自动切关令牌；任何重置/切关都会让它失效
 
 
 func _ready() -> void:
@@ -55,6 +62,8 @@ func start_fixture() -> void:
 func _load(def: Dictionary, index: int, fixture: bool) -> void:
 	level_index = index
 	is_fixture = fixture
+	_chapter_end = false
+	_advance_token += 1        # 让任何在途的自动切关失效
 	_hide_win()
 	_last_result = null
 
@@ -114,6 +123,14 @@ func _on_reset_requested() -> void:
 	if resolver == null:
 		return
 
+	_advance_token += 1             # 取消在途的自动切关（1 秒内按 R 不会被强行带走）
+
+	# 章节结束界面：R = 回到第 1 关重新开始
+	if _chapter_end:
+		print("[reset] 章节结束 → 回到第 1 关")
+		start_level(0)
+		return
+
 	world.stop_animation()          # 打断动画，回调不会再触发
 	resolver.reset()                # 位置 / 方向 / 回合 / 钥匙 / 门 / 压力板 / 出口 / 通关 全部归零
 	world.sync_from(resolver)
@@ -126,10 +143,49 @@ func _on_reset_requested() -> void:
 
 
 func _show_win() -> void:
-	# 通关文案按当前关卡动态生成，不再写死
 	win_level_label.text = "LEVEL %d COMPLETE" % (level_index + 1)
+	_chapter_end = false
+
+	if is_fixture:
+		# 自检室不属于正式流程，通关就停在这里，不往下推
+		win_title_label.text = "YOU WIN"
+		win_hint_label.text = "PRESS R TO RESTART"
+	elif Levels.has_next(level_index):
+		win_title_label.text = "YOU WIN"
+		win_hint_label.text = "NEXT LEVEL..."
+		_schedule_next_level()
+	else:
+		# 最后一关：进入章节结束占位界面
+		_chapter_end = true
+		win_title_label.text = "CHAPTER COMPLETE"
+		win_hint_label.text = "PRESS R TO RESTART"
+
 	win_overlay.visible = true
-	print("[win] 通关 %s 文案=%s" % [str(resolver.state()), win_level_label.text])
+	# 标题长度差异大（YOU WIN / CHAPTER COMPLETE），按长度调字号，避免长标题顶满屏幕
+	win_title_label.add_theme_font_size_override(
+		"font_size", 18 if win_title_label.text.length() <= 8 else 14
+	)
+	print("[win] 通关 %s 文案=%s 标题=%s" % [
+		str(resolver.state()), win_level_label.text, win_title_label.text
+	])
+
+
+## 通关后等 AUTO_ADVANCE_SEC 秒自动进入下一关。
+## 用令牌防止"上一关的回调把下一关带跑"：期间只要发生过重置或切关，令牌就变了。
+func _schedule_next_level() -> void:
+	_advance_token += 1
+	var token := _advance_token
+	await get_tree().create_timer(AUTO_ADVANCE_SEC).timeout
+
+	if token != _advance_token:
+		return                       # 期间按过 R 或已经切过关
+	if resolver == null or not resolver.won:
+		return                       # 状态已经不在通关点
+	if not Levels.has_next(level_index):
+		return
+
+	print("[flow] 自动进入第 %d 关" % (level_index + 2))
+	start_level(level_index + 1)
 
 
 func _hide_win() -> void:
@@ -179,6 +235,7 @@ func _has_user_arg(flag: String) -> bool:
 ## --shot=<路径>          渲染若干帧后截图并退出
 ## --keys=<序列>          截图前按顺序注入按键，用来验证一拍一拍的行为
 ##                        大写 U/D/L/R = 方向键，小写 w/a/s/d = 字母键，X = 重置
+##                        "." = 停顿 1.3 秒（用于等待"通关后自动切关"）
 func _capture_if_requested() -> void:
 	# Release 构建：截图/注入按键全部禁用
 	if not _dev_tools():
@@ -203,6 +260,10 @@ func _capture_if_requested() -> void:
 	)
 
 	for ch in keys:
+		if ch == ".":
+			# 停顿：等自动切关发生（AUTO_ADVANCE_SEC = 1.0s，留 0.3s 余量）
+			await get_tree().create_timer(1.3).timeout
+			continue
 		_tap(ch)
 		await get_tree().create_timer(delay).timeout
 
