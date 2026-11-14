@@ -11,6 +11,7 @@ const DELAY_PREFIX := "--keydelay="
 @onready var router: InputRouter = $InputRouter
 @onready var debug_label: Label = $UI/Debug
 @onready var win_overlay: Control = $UI/WinOverlay
+@onready var win_level_label: Label = $UI/WinOverlay/Center/Box/Level
 
 var resolver: TurnResolver = null
 var level_index := 0
@@ -25,8 +26,13 @@ func _ready() -> void:
 	router.reset_requested.connect(_on_reset_requested)
 	world.step_animation_finished.connect(_on_step_animation_finished)
 
-	# --fixture：加载开发自检用的机关测试室（不是正式关卡）
-	if _has_user_arg("--fixture"):
+	# 调试标签只在 Debug 构建显示
+	debug_label.visible = _dev_tools()
+	print("[build] debug_build=%s dev_tools=%s" % [str(OS.is_debug_build()), str(_dev_tools())])
+
+	# --fixture：加载开发自检用的机关测试室（不是正式关卡）。
+	# Release 构建里 _dev_tools() 为 false，即使传了参数也只会进正式第 1 关。
+	if _dev_tools() and _has_user_arg("--fixture"):
 		start_fixture()
 	else:
 		start_level(0)
@@ -118,8 +124,10 @@ func _on_reset_requested() -> void:
 
 
 func _show_win() -> void:
+	# 通关文案按当前关卡动态生成，不再写死
+	win_level_label.text = "LEVEL %d COMPLETE" % (level_index + 1)
 	win_overlay.visible = true
-	print("[win] 通关 %s" % str(resolver.state()))
+	print("[win] 通关 %s 文案=%s" % [str(resolver.state()), win_level_label.text])
 
 
 func _hide_win() -> void:
@@ -152,9 +160,16 @@ func _dir_char(d: Vector2i) -> String:
 
 
 # ------------------------------------------------------------------ 开发期自检
-# 正常游玩不会用到。发布前可整段删除。
+# 只在 Debug 构建可用；Release 导出后 _dev_tools() 为 false，整段全部失效
+# （命令行传参也无效）。发布前可以选择性删除，保留也不会被玩家触发。
 
-## 开发期自检：判断是否带了某个开关
+## 是否允许使用开发自检功能。
+## Release 导出后 OS.is_debug_build() == false，所有开关自动失效。
+func _dev_tools() -> bool:
+	return OS.is_debug_build()
+
+
+## 开发期：判断是否带了某个开关
 func _has_user_arg(flag: String) -> bool:
 	return OS.get_cmdline_user_args().has(flag)
 
@@ -163,6 +178,10 @@ func _has_user_arg(flag: String) -> bool:
 ## --keys=<序列>          截图前按顺序注入按键，用来验证一拍一拍的行为
 ##                        大写 U/D/L/R = 方向键，小写 w/a/s/d = 字母键，X = 重置
 func _capture_if_requested() -> void:
+	# Release 构建：截图/注入按键全部禁用
+	if not _dev_tools():
+		return
+
 	var path := ""
 	var keys := ""
 	var delay := 0.25
