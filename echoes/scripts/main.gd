@@ -28,7 +28,9 @@ func _ready() -> void:
 
 	# 调试标签只在 Debug 构建显示
 	debug_label.visible = _dev_tools()
-	print("[build] debug_build=%s dev_tools=%s" % [str(OS.is_debug_build()), str(_dev_tools())])
+	print("[build] debug_build=%s dev_tools=%s debug_label=%s" % [
+		str(OS.is_debug_build()), str(_dev_tools()), str(debug_label.visible)
+	])
 
 	# --fixture：加载开发自检用的机关测试室（不是正式关卡）。
 	# Release 构建里 _dev_tools() 为 false，即使传了参数也只会进正式第 1 关。
