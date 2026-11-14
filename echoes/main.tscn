@@ -1,0 +1,84 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/world_view.gd" id="2_world"]
+[ext_resource type="Script" path="res://scripts/actor.gd" id="3_actor"]
+[ext_resource type="Script" path="res://scripts/input_router.gd" id="4_router"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("1_main")
+
+[node name="World" type="Node2D" parent="."]
+script = ExtResource("2_world")
+
+[node name="Shadow" type="Node2D" parent="World"]
+script = ExtResource("3_actor")
+
+[node name="Player" type="Node2D" parent="World"]
+script = ExtResource("3_actor")
+
+[node name="InputRouter" type="Node" parent="."]
+script = ExtResource("4_router")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Debug" type="Label" parent="UI"]
+offset_left = 3.0
+offset_top = 1.0
+offset_right = 300.0
+offset_bottom = 12.0
+theme_override_colors/font_color = Color(0.72, 0.72, 0.66, 1)
+theme_override_font_sizes/font_size = 8
+text = "loading"
+
+[node name="WinOverlay" type="Control" parent="UI"]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Dim" type="ColorRect" parent="UI/WinOverlay"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.035, 0.035, 0.05, 0.78)
+
+[node name="Center" type="CenterContainer" parent="UI/WinOverlay"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Box" type="VBoxContainer" parent="UI/WinOverlay/Center"]
+layout_mode = 2
+theme_override_constants/separation = 5
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="UI/WinOverlay/Center/Box"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.94, 0.65, 0.24, 1)
+theme_override_font_sizes/font_size = 18
+text = "YOU WIN"
+horizontal_alignment = 1
+
+[node name="Level" type="Label" parent="UI/WinOverlay/Center/Box"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.82, 0.78, 1)
+theme_override_font_sizes/font_size = 9
+text = "LEVEL 1 COMPLETE"
+horizontal_alignment = 1
+
+[node name="Hint" type="Label" parent="UI/WinOverlay/Center/Box"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.55, 0.52, 1)
+theme_override_font_sizes/font_size = 8
+text = "PRESS R TO RESTART"
+horizontal_alignment = 1
