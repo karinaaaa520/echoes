@@ -8,6 +8,7 @@
 .godot/
 
 # 导出产物（体积大，且可由源码重新导出）
+exports/
 build/
 *.pck
 *.wasm
